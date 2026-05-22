@@ -20,7 +20,7 @@ class Veicolo(ABC):
         self._tecnico = tecnico
         self._carico_corrente=0
         self._rotto = False
-        self_spare = False
+        self._spare = False
         Veicolo.conteggio += 1
     
     @property
