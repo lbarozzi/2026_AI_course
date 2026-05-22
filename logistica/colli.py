@@ -1,23 +1,31 @@
 '''
 '''
 
-class collo1d:
+class Collo1d:
     contatore = 0
     def __init__(self,kg,cliente:str):
         self._kg=kg
         self._cliente=cliente
-        collo1d.contatore += 1
-        self._id=collo1d.contatore
+        Collo1d.contatore += 1
+        self._id=Collo1d.contatore
 
     @property
     def kg(self):
         return self._kg
+
+    @property
+    def cliente(self):
+        return self._cliente
+
+    @property
+    def id(self):
+        return self._id
     
     def __str__(self):
-        return f"Collo {self._id} da {self._kg} kg per il cliente {self._cliente}"
+        return f"Collo {self.id} da {self.kg} kg per il cliente {self.cliente}"
     
 
-class collo4d(collo1d):
+class Collo4d(Collo1d):
     def __init__(self,kg,cliente:str,lunghezza,larghezza,altezza):
         super().__init__(kg,cliente)
         self._lunghezza=lunghezza
@@ -37,4 +45,4 @@ class collo4d(collo1d):
         return self._altezza
     
     def __str__(self):
-        return f"Collo {self._id} da {self._kg} kg per il cliente {self._cliente} con dimensioni {self._lunghezza}x{self._larghezza}x{self._altezza}"
+        return f"Collo {self.id} da {self.kg} kg per il cliente {self.cliente} con dimensioni {self.lunghezza}x{self.larghezza}x{self.altezza}"

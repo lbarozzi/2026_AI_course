@@ -58,3 +58,19 @@ class Cliente(Anagrafica):
     @indirizzo.setter
     def indirizzo(self, value):
         self._indirizzo = value
+
+    @property
+    def lat(self):
+        return self._lat
+
+    @lat.setter
+    def lat(self, value):
+        self._lat = value
+
+    @property
+    def lng(self):
+        return self._lng
+
+    @lng.setter
+    def lng(self, value):
+        self._lng = value
