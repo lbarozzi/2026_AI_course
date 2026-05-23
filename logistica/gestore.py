@@ -19,6 +19,10 @@ class Gestore:
     @property
     def colli(self):
         return list(self._colli)
+
+    @property
+    def mezzi(self):
+        return list(self._mezzi)
     
     def lista_bici(self, spare=False, rotte=False):
         #return [m for m in self._mezzi if isinstance(m, Bici) and  m.isSpare== spare and m.isRotto==rotte]

@@ -4,18 +4,19 @@ Ottimizzazione ordine consegne (TSP semplificato) su una lista di colli.
 
 from __future__ import annotations
 
+from itertools import combinations
 from math import sqrt
 from random import Random
 from time import perf_counter
 from typing import List, Sequence, Tuple
-from colli import Collo4d
+from colli import Collo1d
 
 class Optimizer:
     def __init__(self, origine: Tuple[float, float] = (0.0, 0.0), ritorno_origine: bool = True):
         self.origine = origine
         self.ritorno_origine = ritorno_origine
 
-    def _coord_cliente(self, collo: Collo4d) -> Tuple[float, float]:
+    def _coord_cliente(self, collo: Collo1d) -> Tuple[float, float]:
         cliente = collo.cliente
         if cliente is None:
             raise ValueError("Ogni collo deve avere un cliente associato")
@@ -29,6 +30,22 @@ class Optimizer:
 
     def _dist(self, a: Tuple[float, float], b: Tuple[float, float]) -> float:
         return sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+    def _dist_colli(self, collo_a: Collo1d, collo_b: Collo1d) -> float:
+        return self._dist(self._coord_cliente(collo_a), self._coord_cliente(collo_b))
+
+    def _build_distance_matrix(self, colli: Sequence[Collo1d]) -> Tuple[List[Tuple[float, float]], List[List[float]]]:
+        punti = [self.origine] + [self._coord_cliente(collo) for collo in colli]
+        size = len(punti)
+        matrix = [[0.0] * size for _ in range(size)]
+
+        for i in range(size):
+            for j in range(i + 1, size):
+                distanza = self._dist(punti[i], punti[j])
+                matrix[i][j] = distanza
+                matrix[j][i] = distanza
+
+        return punti, matrix
 
     def distanza_totale(self, route: Sequence) -> float:
         if not route:
@@ -92,6 +109,117 @@ class Optimizer:
 
         visita([], list(colli), 0.0, self.origine)
         return migliore_percorso
+
+    def held_karp(self, colli: Sequence[Collo1d], max_seconds: float | None = None) -> List[Collo1d]:
+        colli = list(colli)
+        n = len(colli)
+        if n <= 1:
+            return colli
+
+        start_time = perf_counter()
+        _, distanze = self._build_distance_matrix(colli)
+        dp: dict[tuple[int, int], tuple[float, int]] = {}
+
+        for idx in range(1, n + 1):
+            mask = 1 << (idx - 1)
+            dp[(mask, idx)] = (distanze[0][idx], 0)
+
+        for subset_size in range(2, n + 1):
+            for subset in combinations(range(1, n + 1), subset_size):
+                if max_seconds is not None and perf_counter() - start_time >= max_seconds:
+                    raise TimeoutError(f"Tempo massimo superato in Held-Karp ({max_seconds:.2f}s)")
+
+                mask = 0
+                for node in subset:
+                    mask |= 1 << (node - 1)
+
+                for last in subset:
+                    prev_mask = mask ^ (1 << (last - 1))
+                    best_cost = float("inf")
+                    best_prev = -1
+
+                    for prev in subset:
+                        if prev == last:
+                            continue
+                        prev_cost, _ = dp[(prev_mask, prev)]
+                        cost = prev_cost + distanze[prev][last]
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_prev = prev
+
+                    dp[(mask, last)] = (best_cost, best_prev)
+
+        full_mask = (1 << n) - 1
+        best_last = -1
+        best_total = float("inf")
+
+        for last in range(1, n + 1):
+            route_cost, _ = dp[(full_mask, last)]
+            total = route_cost + (distanze[last][0] if self.ritorno_origine else 0.0)
+            if total < best_total:
+                best_total = total
+                best_last = last
+
+        path_indices = []
+        mask = full_mask
+        current = best_last
+        while current > 0:
+            path_indices.append(current)
+            _, prev = dp[(mask, current)]
+            mask ^= 1 << (current - 1)
+            current = prev
+
+        path_indices.reverse()
+        return [colli[idx - 1] for idx in path_indices]
+
+    def nearest_neighbor(self, colli: Sequence[Collo1d]) -> List[Collo1d]:
+        rimanenti = list(colli)
+        if not rimanenti:
+            return []
+
+        percorso = []
+        corrente = self.origine
+
+        while rimanenti:
+            prossimo = min(rimanenti, key=lambda collo: self._dist(corrente, self._coord_cliente(collo)))
+            percorso.append(prossimo)
+            corrente = self._coord_cliente(prossimo)
+            rimanenti.remove(prossimo)
+
+        return percorso
+
+    def two_opt(self, colli: Sequence[Collo1d], max_seconds: float | None = None) -> List[Collo1d]:
+        percorso = list(colli)
+        if len(percorso) <= 2:
+            return percorso
+
+        start_time = perf_counter()
+        best = percorso
+        best_distance = self.distanza_totale(best)
+        improved = True
+
+        while improved:
+            improved = False
+            for i in range(1, len(best) - 1):
+                for j in range(i + 1, len(best)):
+                    if max_seconds is not None and perf_counter() - start_time >= max_seconds:
+                        raise TimeoutError(f"Tempo massimo superato in 2-Opt ({max_seconds:.2f}s)")
+
+                    candidato = best[:i] + list(reversed(best[i:j])) + best[j:]
+                    candidate_distance = self.distanza_totale(candidato)
+                    if candidate_distance < best_distance:
+                        best = candidato
+                        best_distance = candidate_distance
+                        improved = True
+                        break
+                if improved:
+                    break
+
+        return best
+
+    def nn_two_opt(self, colli: Sequence[Collo1d], max_seconds: float | None = None) -> List[Collo1d]:
+        percorso_nn = self.nearest_neighbor(colli)
+        return self.two_opt(percorso_nn, max_seconds=max_seconds)
 
     def fuzzy(
         self,
